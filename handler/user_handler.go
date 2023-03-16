@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"go-mirayway/bootstrap"
 	"go-mirayway/model"
+	"go-mirayway/util"
 	"go-mirayway/util/token"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"golang.org/x/crypto/bcrypt"
@@ -18,6 +19,10 @@ type UserHandler struct {
 	Env            bootstrap.Env
 }
 
+// Signup Function handler: Create a new account for user
+// -> GET information from user
+// -> Validate information (email, username, password)
+// -> Generate hash password for user -> store user information to the database
 func (userHandler *UserHandler) Signup(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c, time.Second*time.Duration(userHandler.Env.ContextTimeout))
 	defer cancel()
@@ -33,10 +38,15 @@ func (userHandler *UserHandler) Signup(c *gin.Context) {
 		return
 	}
 
-	//if err := util.ValidationPassword(user.Password); err != nil {
-	//	c.IndentedJSON(http.StatusBadRequest, model.Message{Message: err.Error()})
-	//	return
-	//}
+	if err := util.ValidateUsername(user.UserName); err != nil {
+		c.IndentedJSON(http.StatusBadRequest, model.Message{Message: err.Error()})
+		return
+	}
+
+	if err := util.ValidatePassword(user.Password); err != nil {
+		c.IndentedJSON(http.StatusBadRequest, model.Message{Message: err.Error()})
+		return
+	}
 
 	hashPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
 	if err != nil {
@@ -53,6 +63,11 @@ func (userHandler *UserHandler) Signup(c *gin.Context) {
 	}
 }
 
+// Login Function handler: Login User using Email and Password
+// -> Get information from user( Email and Password)
+// -> Find User in database that have Email equal Email of user has entered
+// -> Compare password which user entered and hash password of user
+// -> Generate access token and refresh token for user
 func (userHandler *UserHandler) Login(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c, time.Second*time.Duration(userHandler.Env.ContextTimeout))
 	defer cancel()
@@ -70,7 +85,7 @@ func (userHandler *UserHandler) Login(c *gin.Context) {
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(userReal.Password), []byte(loginRequest.Password)); err != nil {
-		c.IndentedJSON(http.StatusBadRequest, model.Message{Message: "wrong password"})
+		c.IndentedJSON(http.StatusUnauthorized, model.Message{Message: "wrong password"})
 		return
 	}
 
@@ -93,54 +108,77 @@ func (userHandler *UserHandler) Login(c *gin.Context) {
 	c.IndentedJSON(http.StatusAccepted, tokenResponse)
 }
 
+// Profile function handler: Get user self Profile;
+// -> Get id From header of request -> id: (any type)
+// -> Create ObjectID from id get before
+// -> Get user from database by id
 func (userHandler *UserHandler) Profile(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c, time.Second*time.Duration(userHandler.Env.ContextTimeout))
 	defer cancel()
 
-	idStr, exist := c.GetQuery("id")
+	idAny, exist := c.Get("x-user-id")
 	if !exist {
-		c.IndentedJSON(http.StatusBadRequest, model.Message{Message: "ID not given"})
+		c.JSON(http.StatusUnauthorized, model.Message{Message: "Unauthorized"})
+		c.Abort()
 		return
 	}
 
-	id, err := primitive.ObjectIDFromHex(idStr)
+	id, err := primitive.ObjectIDFromHex(fmt.Sprintf("%v", idAny))
 	if err != nil {
-		c.IndentedJSON(http.StatusBadRequest, model.Message{Message: "id not true"})
+		c.IndentedJSON(http.StatusUnauthorized, model.Message{Message: "Unauthorized"})
 		return
 	}
 
 	user, err := userHandler.UserRepository.GetUserByID(ctx, id)
 	if err != nil {
-		c.IndentedJSON(http.StatusBadRequest, model.Message{Message: err.Error()})
+		c.IndentedJSON(http.StatusInternalServerError, model.Message{Message: err.Error()})
 		return
 	}
 
 	c.IndentedJSON(http.StatusOK, user)
 }
 
+// ChangePassword function handler: Change password for user
+// -> Get id From header of request -> id: (any type)
+// -> Create ObjectID from id get before
+// -> Get new password from user
+// -> validate password which user just entered
+// -> Hashing password for user
+// -> Update password for user have id equal id that we extracted before
 func (userHandler *UserHandler) ChangePassword(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c, time.Second*time.Duration(userHandler.Env.ContextTimeout))
 	defer cancel()
 
+	idAny, exist := c.Get("x-user-id")
+	if !exist {
+		c.IndentedJSON(http.StatusBadRequest, model.Message{Message: "Unauthorized"})
+		return
+	}
+
+	id, err := primitive.ObjectIDFromHex(fmt.Sprintf("%v", idAny))
+	if err != nil {
+		c.IndentedJSON(http.StatusBadRequest, model.Message{Message: "Unauthorized"})
+		return
+	}
+
 	var password model.Password
 	if err := c.ShouldBind(&password); err != nil {
-		c.IndentedJSON(http.StatusBadRequest, model.Message{Message: "password invalid"})
+		c.IndentedJSON(http.StatusBadRequest, model.Message{Message: "password is required"})
 		return
 	}
 
-	idStr, exist := c.GetQuery("id")
-	if !exist {
-		c.IndentedJSON(http.StatusBadRequest, model.Message{Message: "not given id"})
-		return
-	}
-
-	id, err := primitive.ObjectIDFromHex(idStr)
-	if err != nil {
+	if err := util.ValidatePassword(password.Password); err != nil {
 		c.IndentedJSON(http.StatusBadRequest, model.Message{Message: err.Error()})
 		return
 	}
 
-	if err := userHandler.UserRepository.UpdatePassword(ctx, id, password.Password); err != nil {
+	hashPassword, err := bcrypt.GenerateFromPassword([]byte(password.Password), bcrypt.DefaultCost)
+	if err != nil {
+		c.IndentedJSON(http.StatusInternalServerError, model.Message{Message: err.Error()})
+		return
+	}
+
+	if err := userHandler.UserRepository.UpdatePassword(ctx, id, string(hashPassword)); err != nil {
 		c.IndentedJSON(http.StatusBadRequest, model.Message{Message: err.Error()})
 		return
 	}

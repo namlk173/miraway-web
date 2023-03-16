@@ -17,6 +17,6 @@ func NewApp() *Application {
 	}
 }
 
-func (app *Application) CloseDatabase() {
+func (app *Application) Close() {
 	CLoseMongoClient(app.Mongo)
 }

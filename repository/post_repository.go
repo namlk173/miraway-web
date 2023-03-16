@@ -6,6 +6,7 @@ import (
 	"go-mirayway/mongodbImplement"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"time"
 )
 
 type postRepository struct {
@@ -20,24 +21,26 @@ func NewPostRepository(db mongodbImplement.Database, collection string) model.Po
 	}
 }
 
-func (postRepo *postRepository) Create(ctx context.Context, post *model.PostWriter) error {
+func (postRepo *postRepository) Create(ctx context.Context, post *model.PostWriter) (interface{}, error) {
 	collection := postRepo.db.Collection(postRepo.collection)
-	_, err := collection.InsertOne(ctx, post)
-	return err
+	id, err := collection.InsertOne(ctx, post)
+	return id, err
 }
 
-func (postRepo *postRepository) Delete(ctx context.Context, ID primitive.ObjectID) error {
+func (postRepo *postRepository) Delete(ctx context.Context, postID, userID primitive.ObjectID) (int64, error) {
 	collection := postRepo.db.Collection(postRepo.collection)
-	_, err := collection.DeleteOne(ctx, bson.D{{"_id", ID}})
-	return err
+	filter := bson.D{{"_id", postID}, {"owner._id", userID}, {"is_deleted", bson.D{{"$ne", true}}}}
+	deleteQuery := bson.D{{"$set", bson.D{{"is_deleted", true}}}}
+	res, err := collection.UpdateOne(ctx, filter, deleteQuery)
+	return res.MatchedCount, err
 }
 
-func (postRepo *postRepository) Update(ctx context.Context, ID primitive.ObjectID, post model.Post) error {
+func (postRepo *postRepository) Update(ctx context.Context, postID, userID primitive.ObjectID, post model.PostRequest) (int64, error) {
 	collection := postRepo.db.Collection(postRepo.collection)
-	filter := bson.D{{"_id", ID}}
-	updateQuery := bson.D{{"$set", bson.D{{"title", post.Title}, {"content", post.Content}}}}
-	_, err := collection.UpdateOne(ctx, filter, updateQuery)
-	return err
+	filter := bson.D{{"_id", postID}, {"owner._id", userID}}
+	updateQuery := bson.D{{"$set", bson.D{{"title", post.Title}, {"content", post.Content}, {"updated_at", time.Now()}}}}
+	res, err := collection.UpdateOne(ctx, filter, updateQuery)
+	return res.MatchedCount, err
 }
 
 func (postRepo *postRepository) Find(ctx context.Context, ID primitive.ObjectID) (*model.Post, error) {

@@ -4,12 +4,15 @@ import (
 	"github.com/gin-gonic/gin"
 	"go-mirayway/bootstrap"
 	"go-mirayway/handler"
-	"go-mirayway/mongodbImplement"
 	"go-mirayway/repository"
-	"time"
 )
 
-func InitRoute(database mongodbImplement.Database, env bootstrap.Env) *gin.Engine {
+func InitRoute(app bootstrap.Application) *gin.Engine {
+	// Init database and environment variables
+	env := *app.Env
+	database := app.Mongo.Database(env.DBName)
+
+	// Init Routes
 	r := gin.Default()
 
 	userRepository := repository.NewUserRepository(database, "user")
@@ -21,7 +24,8 @@ func InitRoute(database mongodbImplement.Database, env bootstrap.Env) *gin.Engin
 	postRepository := repository.NewPostRepository(database, "post")
 	postHandler := handler.PostHandler{
 		PostRepository: postRepository,
-		Timeout:        time.Duration(env.ContextTimeout),
+		UserRepository: userRepository,
+		Env:            env,
 	}
 
 	v1 := r.Group("api/v1")
