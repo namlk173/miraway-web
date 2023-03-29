@@ -4,6 +4,7 @@ import (
 	"context"
 	"go-mirayway/model"
 	"go-mirayway/mongodbImplement"
+
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -61,16 +62,16 @@ func (userRepo *userRepository) GetUserByID(ctx context.Context, ID primitive.Ob
 	return &user, nil
 }
 
-func (userRepo *userRepository) UpdateUser(ctx context.Context, ID primitive.ObjectID, user *model.User) (*model.User, error) {
+func (userRepo *userRepository) UpdateUser(ctx context.Context, ID primitive.ObjectID, user *model.UserReader) error {
 	collection := userRepo.db.Collection(userRepo.collection)
 	filter := bson.D{{"_id", ID}}
-	updateQuery := bson.D{{"$set", bson.D{{"username", user.UserName}, {"email", user.UserName}, {"password", user.Password}}}}
+	updateQuery := bson.D{{"$set", bson.D{{"firstname", user.FirstName}, {"surname", user.SurName}, {"phone", user.MobilePhone}, {"address1", user.Address1}, {"address2", user.Address2}, {"education", user.Education}, {"country", user.Counttry}, {"state", user.State}}}}
 	_, err := collection.UpdateOne(ctx, filter, updateQuery)
 	if err != nil {
-		return &model.User{}, nil
+		return err
 	}
 
-	return user, nil
+	return nil
 }
 
 func (userRepo *userRepository) UpdatePassword(ctx context.Context, ID primitive.ObjectID, password string) error {

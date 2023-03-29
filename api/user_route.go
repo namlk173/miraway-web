@@ -1,9 +1,10 @@
 package api
 
 import (
-	"github.com/gin-gonic/gin"
 	"go-mirayway/api/middleware"
 	"go-mirayway/handler"
+
+	"github.com/gin-gonic/gin"
 )
 
 type UserApi struct {
@@ -19,10 +20,11 @@ func NewUserApi(group *gin.RouterGroup, handler handler.UserHandler) *UserApi {
 
 	s.POST("/signup", s.UserHandler.Signup)
 	s.POST("/login", s.UserHandler.Login)
+	s.POST("/refresh", s.UserHandler.RefeshToken)
 	// NEED MIDDLEWARE FOR THIS
 	s.Use(middleware.JwtAuthMiddleware(handler.Env.AccessTokenSecret))
 	s.GET("/profile", s.UserHandler.Profile)
+	s.PUT("/profile/change", s.UserHandler.ChangeProfile)
 	s.PUT("/profile/change-password", s.UserHandler.ChangePassword)
-
 	return s
 }

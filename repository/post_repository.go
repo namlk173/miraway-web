@@ -4,9 +4,11 @@ import (
 	"context"
 	"go-mirayway/model"
 	"go-mirayway/mongodbImplement"
+	"time"
+
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"time"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type postRepository struct {
@@ -37,7 +39,7 @@ func (postRepo *postRepository) Delete(ctx context.Context, postID, userID primi
 
 func (postRepo *postRepository) Update(ctx context.Context, postID, userID primitive.ObjectID, post model.PostRequest) (int64, error) {
 	collection := postRepo.db.Collection(postRepo.collection)
-	filter := bson.D{{"_id", postID}, {"owner._id", userID}}
+	filter := bson.D{{"_id", postID}, {"owner._id", userID}, {"is_deleted", bson.D{{"$ne", true}}}}
 	updateQuery := bson.D{{"$set", bson.D{{"title", post.Title}, {"content", post.Content}, {"updated_at", time.Now()}}}}
 	res, err := collection.UpdateOne(ctx, filter, updateQuery)
 	return res.MatchedCount, err
@@ -52,10 +54,15 @@ func (postRepo *postRepository) Find(ctx context.Context, ID primitive.ObjectID)
 	return &post, nil
 }
 
-func (postRepo *postRepository) List(ctx context.Context) ([]model.Post, error) {
+func (postRepo *postRepository) List(ctx context.Context, skip, limit int64) ([]model.Post, error) {
 	collection := postRepo.db.Collection(postRepo.collection)
 	var post []model.Post
-	cur, err := collection.Find(ctx, bson.D{})
+	skipStage := bson.D{{"$skip", skip}}
+	limitStage := bson.D{{"$limit", limit}}
+	matchStage := bson.D{{"$match", bson.D{{"is_deleted", bson.D{{"$ne", true}}}}}}
+	sortStage := bson.D{{"$sort", bson.D{{"created_at", -1}}}}
+
+	cur, err := collection.Aggregate(ctx, mongo.Pipeline{matchStage, sortStage, skipStage, limitStage})
 	if err != nil {
 		return []model.Post{}, err
 	}
@@ -70,7 +77,7 @@ func (postRepo *postRepository) List(ctx context.Context) ([]model.Post, error) 
 func (postRepo *postRepository) ListPostByUser(ctx context.Context, userID primitive.ObjectID) ([]model.Post, error) {
 	collection := postRepo.db.Collection(postRepo.collection)
 	var post []model.Post
-	cur, err := collection.Find(ctx, bson.D{{"author._id", userID}})
+	cur, err := collection.Find(ctx, bson.D{{"owner._id", userID}, {"is_deleted", bson.D{{"$ne", true}}}})
 	if err != nil {
 		return []model.Post{}, err
 	}

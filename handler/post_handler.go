@@ -9,6 +9,7 @@ import (
 	"go-mirayway/util"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"net/http"
+	"strconv"
 	"time"
 )
 
@@ -71,13 +72,9 @@ func (postHandler *PostHandler) GetPostByID(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c, time.Second*time.Duration(postHandler.Env.ContextTimeout))
 	defer cancel()
 
-	idstr, exist := c.GetQuery("_id")
-	if !exist {
-		c.JSON(http.StatusBadRequest, model.Message{Message: "not given _id for post"})
-		return
-	}
+	idStr := c.Request.URL.Query().Get("_id")
 
-	id, err := primitive.ObjectIDFromHex(idstr)
+	id, err := primitive.ObjectIDFromHex(idStr)
 	if err != nil {
 		c.JSON(http.StatusNotFound, model.Message{Message: "id not true"})
 		return
@@ -86,6 +83,11 @@ func (postHandler *PostHandler) GetPostByID(c *gin.Context) {
 	post, err := postHandler.PostRepository.Find(ctx, id)
 	if err != nil {
 		c.JSON(http.StatusNotFound, model.Message{Message: "not found post for this _id"})
+		return
+	}
+
+	if post.IsDeleted {
+		c.JSON(http.StatusNotFound, model.Message{Message: "This post has been deleted"})
 		return
 	}
 
@@ -108,12 +110,7 @@ func (postHandler *PostHandler) UpdatePost(c *gin.Context) {
 		return
 	}
 
-	postIdStr, exist := c.GetQuery("_id")
-	if !exist {
-		c.IndentedJSON(http.StatusBadRequest, model.Message{Message: "not give _id"})
-		return
-	}
-
+	postIdStr := c.Request.URL.Query().Get("_id")
 	postID, err := primitive.ObjectIDFromHex(postIdStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, model.Message{Message: "_id not true"})
@@ -161,12 +158,7 @@ func (postHandler *PostHandler) DeletePost(c *gin.Context) {
 		return
 	}
 
-	postIdStr, exist := c.GetQuery("_id")
-	if !exist {
-		c.IndentedJSON(http.StatusBadRequest, model.Message{Message: "not give _id"})
-		return
-	}
-
+	postIdStr := c.Request.URL.Query().Get("_id")
 	postID, err := primitive.ObjectIDFromHex(postIdStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, model.Message{Message: "_id not true"})
@@ -186,4 +178,51 @@ func (postHandler *PostHandler) DeletePost(c *gin.Context) {
 
 	c.IndentedJSON(http.StatusAccepted, model.Message{Message: "deleted post successfully"})
 
+}
+
+func (postHandler *PostHandler) ListAllPost(c *gin.Context) {
+	ctx, cancel := context.WithTimeout(c, time.Second*time.Duration(postHandler.Env.ContextTimeout))
+	defer cancel()
+
+	s := c.Request.URL.Query().Get("skip")
+	l := c.Request.URL.Query().Get("limit")
+	skip, err := strconv.Atoi(s)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, model.Message{Message: err.Error()})
+		return
+	}
+
+	limit, err := strconv.Atoi(l)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, model.Message{Message: err.Error()})
+		return
+	}
+
+	posts, err := postHandler.PostRepository.List(ctx, int64(skip), int64(limit))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	c.JSON(http.StatusOK, posts)
+}
+
+func (postHandler *PostHandler) ListPostByUser(c *gin.Context) {
+	ctx, cancel := context.WithTimeout(c, time.Second*time.Duration(postHandler.Env.ContextTimeout))
+	defer cancel()
+
+	userIdStr := c.Request.URL.Query().Get("_id")
+	userId, err := primitive.ObjectIDFromHex(userIdStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, model.Message{Message: "user not found"})
+		return
+	}
+
+	posts, err := postHandler.PostRepository.ListPostByUser(ctx, userId)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, err.Error())
+		return
+	}
+	
+	c.JSON(http.StatusOK, posts)
 }

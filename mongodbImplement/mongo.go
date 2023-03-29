@@ -18,6 +18,7 @@ type Collection interface {
 	//Aggregate(context.Context, interface{}) (Cursor, error)
 	UpdateOne(context.Context, interface{}, interface{}, ...*options.UpdateOptions) (*mongo.UpdateResult, error)
 	//UpdateMany(context.Context, interface{}, interface{}, ...*options.UpdateOptions) (*mongoImplement.UpdateResult, error)
+	Aggregate(ctx context.Context, pipeline interface{}, opts ...*options.AggregateOptions) (Cursor, error)
 }
 
 type Database interface {
@@ -129,6 +130,11 @@ func (coll *mongoCollection) DeleteOne(ctx context.Context, filter interface{}) 
 }
 func (coll *mongoCollection) UpdateOne(ctx context.Context, filter interface{}, update interface{}, options ...*options.UpdateOptions) (*mongo.UpdateResult, error) {
 	return coll.collection.UpdateOne(ctx, filter, update, options...)
+}
+
+func (coll *mongoCollection) Aggregate(ctx context.Context, pipeline interface{}, opts ...*options.AggregateOptions) (Cursor, error) {
+	res, err := coll.collection.Aggregate(ctx, pipeline, opts...)
+	return &mongoCursor{cursor: res}, err
 }
 
 // Implement Cursor interface for mongoCursor struct

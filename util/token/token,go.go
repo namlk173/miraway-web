@@ -2,12 +2,13 @@ package token
 
 import (
 	"fmt"
-	"github.com/golang-jwt/jwt/v4"
 	"go-mirayway/model"
 	"time"
+
+	"github.com/golang-jwt/jwt/v4"
 )
 
-func CreateAccessToken(user *model.User, secret string, expiry int) (string, error) {
+func CreateAccessToken(user *model.UserReader, secret string, expiry int) (string, error) {
 	exp := time.Now().Add(time.Hour * time.Duration(expiry)).Unix()
 	claims := &model.JwtCustomClaims{
 		ID:       user.ID.Hex(),

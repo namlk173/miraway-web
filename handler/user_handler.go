@@ -7,12 +7,14 @@ import (
 	"go-mirayway/model"
 	"go-mirayway/util"
 	"go-mirayway/util/token"
+	"net/http"
+	"strings"
+	"time"
+
+	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"golang.org/x/crypto/bcrypt"
-	"net/http"
-	"time"
 )
-import "github.com/gin-gonic/gin"
 
 type UserHandler struct {
 	UserRepository model.UserRepository
@@ -33,6 +35,7 @@ func (userHandler *UserHandler) Signup(c *gin.Context) {
 		return
 	}
 
+	user.Email = strings.ToLower(user.Email)
 	if _, err := userHandler.UserRepository.GetUserByEmail(ctx, user.Email); err == nil {
 		c.IndentedJSON(http.StatusBadRequest, model.Message{Message: "email has exist"})
 		return
@@ -78,6 +81,7 @@ func (userHandler *UserHandler) Login(c *gin.Context) {
 		return
 	}
 
+	loginRequest.Email = strings.ToLower(loginRequest.Email)
 	userReal, err := userHandler.UserRepository.GetUserByEmail(ctx, loginRequest.Email)
 	if err != nil {
 		c.IndentedJSON(http.StatusBadRequest, model.Message{Message: fmt.Sprintf("not found user with email: %v", loginRequest.Email)})
@@ -89,7 +93,11 @@ func (userHandler *UserHandler) Login(c *gin.Context) {
 		return
 	}
 
-	accessToken, err := token.CreateAccessToken(userReal, userHandler.Env.AccessTokenSecret, userHandler.Env.AccessTokenExpiry)
+	accessToken, err := token.CreateAccessToken(&model.UserReader{
+		ID:       userReal.ID,
+		UserName: userReal.UserName,
+		Email:    userReal.Email,
+	}, userHandler.Env.AccessTokenSecret, userHandler.Env.AccessTokenExpiry)
 	if err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, model.Message{Message: err.Error()})
 		return
@@ -161,7 +169,9 @@ func (userHandler *UserHandler) ChangePassword(c *gin.Context) {
 		return
 	}
 
-	var password model.Password
+	var password = struct {
+		Password string `json:"password" bson:"password" binding:"required"`
+	}{}
 	if err := c.ShouldBind(&password); err != nil {
 		c.IndentedJSON(http.StatusBadRequest, model.Message{Message: "password is required"})
 		return
@@ -184,4 +194,81 @@ func (userHandler *UserHandler) ChangePassword(c *gin.Context) {
 	}
 
 	c.IndentedJSON(http.StatusAccepted, model.Message{Message: "change password successful"})
+}
+
+func (userHandler *UserHandler) RefeshToken(c *gin.Context) {
+	ctx, cancel := context.WithTimeout(c, time.Duration(userHandler.Env.ContextTimeout)*time.Second)
+	defer cancel()
+
+	var refresh = struct {
+		Refresh string `json:"refresh" binding:"required"`
+	}{}
+
+	if err := c.ShouldBind(&refresh); err != nil {
+		c.IndentedJSON(http.StatusBadRequest, model.Message{Message: "refresh token required"})
+		return
+	}
+
+	idExtract, err := token.ExtractIDFromToken(refresh.Refresh, userHandler.Env.RefreshTokenSecret)
+	if err != nil {
+		c.IndentedJSON(http.StatusBadRequest, model.Message{Message: "refresh token not true"})
+		return
+	}
+
+	id, err := primitive.ObjectIDFromHex(idExtract)
+	if err != nil {
+		c.IndentedJSON(http.StatusBadRequest, model.Message{Message: "id not true"})
+		return
+	}
+
+	user, err := userHandler.UserRepository.GetUserByID(ctx, id)
+	if err != nil {
+		c.IndentedJSON(http.StatusBadRequest, model.Message{Message: "not found user"})
+		return
+	}
+
+	accessToken, err := token.CreateAccessToken(user, userHandler.Env.AccessTokenSecret, userHandler.Env.AccessTokenExpiry)
+	if err != nil {
+		c.IndentedJSON(http.StatusBadRequest, model.Message{Message: err.Error()})
+		return
+	}
+
+	loginResponse := model.LoginResponse{
+		RefreshToken: refresh.Refresh,
+		AccessToken:  accessToken,
+	}
+	c.IndentedJSON(http.StatusOK, loginResponse)
+}
+
+func (userHandler *UserHandler) ChangeProfile(c *gin.Context) {
+	ctx, cancel := context.WithTimeout(c, time.Duration(userHandler.Env.ContextTimeout)*time.Second)
+	defer cancel()
+
+	idAny, exist := c.Get("x-user-id")
+	if !exist {
+		c.JSON(http.StatusUnauthorized, model.Message{Message: "Unauthorized"})
+		c.Abort()
+		return
+	}
+
+	id, err := primitive.ObjectIDFromHex(fmt.Sprintf("%v", idAny))
+	if err != nil {
+		c.IndentedJSON(http.StatusUnauthorized, model.Message{Message: "Unauthorized"})
+		return
+	}
+
+	var user model.UserReader
+	if err := c.BindJSON(&user); err != nil {
+		c.IndentedJSON(http.StatusBadRequest, model.Message{Message: err.Error()})
+		return
+	}
+
+	fmt.Println(user)
+
+	if err := userHandler.UserRepository.UpdateUser(ctx, id, &user); err != nil {
+		c.IndentedJSON(http.StatusInternalServerError, model.Message{Message: err.Error()})
+		return
+	}
+
+	c.IndentedJSON(http.StatusAccepted, model.Message{Message: "update profile successfully"})
 }

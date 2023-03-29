@@ -2,6 +2,7 @@ package api
 
 import (
 	"github.com/gin-gonic/gin"
+	"go-mirayway/api/middleware"
 	"go-mirayway/bootstrap"
 	"go-mirayway/handler"
 	"go-mirayway/repository"
@@ -14,6 +15,7 @@ func InitRoute(app bootstrap.Application) *gin.Engine {
 
 	// Init Routes
 	r := gin.Default()
+	r.Use(middleware.AddHeader())
 
 	userRepository := repository.NewUserRepository(database, "user")
 	userHandler := handler.UserHandler{

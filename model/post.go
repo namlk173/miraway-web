@@ -2,14 +2,15 @@ package model
 
 import (
 	"context"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"time"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type Post struct {
 	ID        primitive.ObjectID `json:"_id,omitempty" bson:"_id,omitempty"`
 	Title     string             `json:"title" bson:"title" binding:"required"`
-	Content   string             `json:"content" bson:"content" binding:"required""`
+	Content   string             `json:"content" bson:"content" binding:"required"`
 	Owner     UserReader         `json:"owner" bson:"owner"`
 	CreatedAt time.Time          `json:"created_at" bson:"created_at"`
 	UpdatedAt time.Time          `json:"updated_at,omitempty," bson:"updated_at,omitempty"`
@@ -18,12 +19,12 @@ type Post struct {
 
 type PostRequest struct {
 	Title   string `json:"title" bson:"title" binding:"required"`
-	Content string `json:"content" bson:"content" binding:"required""`
+	Content string `json:"content" bson:"content" binding:"required"`
 }
 
 type PostWriter struct {
 	Title     string     `json:"title" bson:"title" binding:"required"`
-	Content   string     `json:"content" bson:"content" binding:"required""`
+	Content   string     `json:"content" bson:"content" binding:"required"`
 	Owner     UserReader `json:"owner" bson:"owner"`
 	CreatedAt time.Time  `json:"created_at" bson:"created_at"`
 }
@@ -34,7 +35,7 @@ type (
 		Delete(ctx context.Context, postID, userID primitive.ObjectID) (int64, error)
 		Update(ctx context.Context, postID, userID primitive.ObjectID, post PostRequest) (int64, error)
 		Find(ctx context.Context, ID primitive.ObjectID) (*Post, error)
-		List(ctx context.Context) ([]Post, error)
+		List(ctx context.Context, skip, limit int64) ([]Post, error)
 		ListPostByUser(ctx context.Context, userID primitive.ObjectID) ([]Post, error)
 	}
 )
