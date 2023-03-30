@@ -14,8 +14,8 @@ var (
 	RequiredLengthUsername    = 3
 	LimitLengthTitlePost      = 200
 	RequiredLengthTitlePost   = 1
-	LimitLengthContentPost    = 500
-	RequiredLengthContentPost = 5
+	LimitLengthContentPost    = 10000
+	RequiredLengthContentPost = 3
 )
 
 func Limit(str string, limit, required int) bool {
@@ -24,7 +24,7 @@ func Limit(str string, limit, required int) bool {
 
 func ValidatePassword(password string) error {
 	if !Limit(password, LimitLengthPassword, RequiredLengthPassword) {
-		return errors.New(fmt.Sprintf("password must be >= %v and <= %v characters", RequiredLengthPassword, LimitLengthPassword))
+		return fmt.Errorf("password must be >= %v and <= %v characters", RequiredLengthPassword, LimitLengthPassword)
 	}
 
 	if strings.Contains(password, " ") {
@@ -36,7 +36,7 @@ func ValidatePassword(password string) error {
 
 func ValidateUsername(username string) error {
 	if !Limit(username, LimitLengthUsername, RequiredLengthUsername) {
-		return errors.New(fmt.Sprintf("username must be >= %v and <= %v characters", RequiredLengthUsername, LimitLengthUsername))
+		return fmt.Errorf("username must be >= %v and <= %v characters", RequiredLengthUsername, LimitLengthUsername)
 	}
 
 	if strings.Contains(username, " ") {
@@ -48,11 +48,11 @@ func ValidateUsername(username string) error {
 
 func ValidatePost(post model.PostRequest) error {
 	if !Limit(post.Title, LimitLengthTitlePost, RequiredLengthTitlePost) {
-		return errors.New(fmt.Sprintf("Title post must be >= %v and <= %v characters", RequiredLengthTitlePost, LimitLengthTitlePost))
+		return fmt.Errorf("title post must be >= %v and <= %v characters", RequiredLengthTitlePost, LimitLengthTitlePost)
 	}
 
 	if !Limit(post.Content, LimitLengthContentPost, RequiredLengthContentPost) {
-		return errors.New(fmt.Sprintf("Title post must be >= %v and <= %v characters", RequiredLengthContentPost, LimitLengthContentPost))
+		return fmt.Errorf("content post must be >= %v and <= %v characters", RequiredLengthContentPost, LimitLengthContentPost)
 	}
 
 	return nil

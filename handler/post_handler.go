@@ -3,14 +3,17 @@ package handler
 import (
 	"context"
 	"fmt"
-	"github.com/gin-gonic/gin"
 	"go-mirayway/bootstrap"
 	"go-mirayway/model"
 	"go-mirayway/util"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"net/http"
+	"path/filepath"
 	"strconv"
 	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type PostHandler struct {
@@ -24,7 +27,7 @@ func (postHandler *PostHandler) Create(c *gin.Context) {
 	defer cancel()
 
 	var post model.PostRequest
-	if err := c.ShouldBind(&post); err != nil {
+	if err := c.Bind(&post); err != nil {
 		c.IndentedJSON(http.StatusBadRequest, model.Message{Message: err.Error()})
 		return
 	}
@@ -52,9 +55,23 @@ func (postHandler *PostHandler) Create(c *gin.Context) {
 		return
 	}
 
+	var fileNameSave string
+
+	if post.File != nil {
+		extension := filepath.Ext(post.File.Filename)
+		fileNameSave := "upload/post/" + uuid.New().String() + extension
+		if err := c.SaveUploadedFile(post.File, fileNameSave); err != nil {
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
+				"message": "Unable to save the file",
+			})
+			return
+		}
+	}
+
 	postWriter := model.PostWriter{
 		Title:     post.Title,
 		Content:   post.Content,
+		ImageURL:  fileNameSave,
 		Owner:     *user,
 		CreatedAt: time.Now(),
 	}
@@ -223,6 +240,6 @@ func (postHandler *PostHandler) ListPostByUser(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, err.Error())
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, posts)
 }

@@ -1,11 +1,13 @@
 package api
 
 import (
-	"github.com/gin-gonic/gin"
 	"go-mirayway/api/middleware"
 	"go-mirayway/bootstrap"
 	"go-mirayway/handler"
 	"go-mirayway/repository"
+
+	"github.com/gin-contrib/static"
+	"github.com/gin-gonic/gin"
 )
 
 func InitRoute(app bootstrap.Application) *gin.Engine {
@@ -35,6 +37,7 @@ func InitRoute(app bootstrap.Application) *gin.Engine {
 		NewUserApi(v1.Group("user"), userHandler)
 		NewPostApi(v1.Group("post"), postHandler)
 	}
+	r.Use(static.Serve("/upload", static.LocalFile("./upload", true)))
 
 	return r
 }
