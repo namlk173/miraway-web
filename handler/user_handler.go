@@ -3,11 +3,13 @@ package handler
 import (
 	"context"
 	"fmt"
+	"github.com/google/uuid"
 	"go-mirayway/bootstrap"
 	"go-mirayway/model"
 	"go-mirayway/util"
 	"go-mirayway/util/token"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -258,12 +260,27 @@ func (userHandler *UserHandler) ChangeProfile(c *gin.Context) {
 	}
 
 	var user model.UserReader
-	if err := c.BindJSON(&user); err != nil {
+	if err := c.Bind(&user); err != nil {
 		c.IndentedJSON(http.StatusBadRequest, model.Message{Message: err.Error()})
 		return
 	}
 
 	fmt.Println(user)
+
+	var userAvatarURL string
+	if user.AvatarFile != nil {
+		extension := filepath.Ext(user.AvatarFile.Filename)
+		userAvatarURL = "upload/user/" + uuid.New().String() + extension
+		if err := c.SaveUploadedFile(user.AvatarFile, userAvatarURL); err != nil {
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
+				"message": "Unable to save the file",
+			})
+			return
+		}
+	}
+
+	user.AvatarURL = userAvatarURL
+	user.AvatarFile = nil
 
 	if err := userHandler.UserRepository.UpdateUser(ctx, id, &user); err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, model.Message{Message: err.Error()})

@@ -59,7 +59,7 @@ func (postHandler *PostHandler) Create(c *gin.Context) {
 
 	if post.File != nil {
 		extension := filepath.Ext(post.File.Filename)
-		fileNameSave := "upload/post/" + uuid.New().String() + extension
+		fileNameSave = "upload/post/" + uuid.New().String() + extension
 		if err := c.SaveUploadedFile(post.File, fileNameSave); err != nil {
 			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
 				"message": "Unable to save the file",
@@ -67,6 +67,8 @@ func (postHandler *PostHandler) Create(c *gin.Context) {
 			return
 		}
 	}
+
+	fmt.Println(fileNameSave)
 
 	postWriter := model.PostWriter{
 		Title:     post.Title,

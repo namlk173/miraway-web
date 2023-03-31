@@ -51,6 +51,10 @@ func ValidatePost(post model.PostRequest) error {
 		return fmt.Errorf("title post must be >= %v and <= %v characters", RequiredLengthTitlePost, LimitLengthTitlePost)
 	}
 
+	if strings.Contains(post.Content, "<img src=\"") {
+		LimitLengthContentPost = 500000
+	}
+
 	if !Limit(post.Content, LimitLengthContentPost, RequiredLengthContentPost) {
 		return fmt.Errorf("content post must be >= %v and <= %v characters", RequiredLengthContentPost, LimitLengthContentPost)
 	}

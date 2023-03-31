@@ -65,7 +65,7 @@ func (userRepo *userRepository) GetUserByID(ctx context.Context, ID primitive.Ob
 func (userRepo *userRepository) UpdateUser(ctx context.Context, ID primitive.ObjectID, user *model.UserReader) error {
 	collection := userRepo.db.Collection(userRepo.collection)
 	filter := bson.D{{"_id", ID}}
-	updateQuery := bson.D{{"$set", bson.D{{"firstname", user.FirstName}, {"surname", user.SurName}, {"phone", user.MobilePhone}, {"address1", user.Address1}, {"address2", user.Address2}, {"education", user.Education}, {"country", user.Counttry}, {"state", user.State}}}}
+	updateQuery := bson.D{{"$set", bson.D{{"firstname", user.FirstName}, {"surname", user.SurName}, {"phone", user.MobilePhone}, {"address1", user.Address1}, {"address2", user.Address2}, {"education", user.Education}, {"country", user.Counttry}, {"state", user.State}, {"avatar_url", user.AvatarURL}}}}
 	_, err := collection.UpdateOne(ctx, filter, updateQuery)
 	if err != nil {
 		return err
