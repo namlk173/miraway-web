@@ -11,7 +11,7 @@ import (
 func CreateAccessToken(user *model.UserReader, secret string, expiry int) (string, error) {
 	exp := time.Now().Add(time.Hour * time.Duration(expiry)).Unix()
 	claims := &model.JwtCustomClaims{
-		ID:       user.ID.Hex(),
+		ID:       user.ID,
 		Username: user.UserName,
 		Email:    user.Email,
 		StandardClaims: jwt.StandardClaims{
@@ -32,7 +32,7 @@ func CreateAccessToken(user *model.UserReader, secret string, expiry int) (strin
 func CreateRefreshToken(user *model.User, secret string, expiry int) (string, error) {
 	exp := time.Now().Add(time.Hour * time.Duration(expiry)).Unix()
 	claims := &model.JwtCustomRefreshClaims{
-		ID: user.ID.Hex(),
+		ID: user.ID,
 		StandardClaims: jwt.StandardClaims{
 			ExpiresAt: exp,
 		},

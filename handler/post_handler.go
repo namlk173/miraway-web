@@ -13,7 +13,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type PostHandler struct {
@@ -37,19 +36,13 @@ func (postHandler *PostHandler) Create(c *gin.Context) {
 		return
 	}
 
-	idAny, exits := c.Get("x-user-id")
+	id, exits := c.Get("x-user-id")
 	if !exits {
 		c.JSON(http.StatusUnauthorized, model.Message{Message: "Unauthorized"})
 		return
 	}
 
-	id, err := primitive.ObjectIDFromHex(fmt.Sprintf("%v", idAny))
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, model.Message{Message: "Unauthorized"})
-		return
-	}
-
-	user, err := postHandler.UserRepository.GetUserByID(ctx, id)
+	user, err := postHandler.UserRepository.GetUserByID(ctx, fmt.Sprintf("%v", id))
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, model.Message{Message: "Unauthorized"})
 		return
@@ -70,7 +63,8 @@ func (postHandler *PostHandler) Create(c *gin.Context) {
 
 	fmt.Println(fileNameSave)
 
-	postWriter := model.PostWriter{
+	postWriter := model.Post{
+		ID:        fmt.Sprintf("post_%v", uuid.New().String()),
 		Title:     post.Title,
 		Content:   post.Content,
 		ImageURL:  fileNameSave,
@@ -91,13 +85,7 @@ func (postHandler *PostHandler) GetPostByID(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c, time.Second*time.Duration(postHandler.Env.ContextTimeout))
 	defer cancel()
 
-	idStr := c.Request.URL.Query().Get("_id")
-
-	id, err := primitive.ObjectIDFromHex(idStr)
-	if err != nil {
-		c.JSON(http.StatusNotFound, model.Message{Message: "id not true"})
-		return
-	}
+	id := c.Request.URL.Query().Get("_id")
 
 	post, err := postHandler.PostRepository.Find(ctx, id)
 	if err != nil {
@@ -117,27 +105,16 @@ func (postHandler *PostHandler) UpdatePost(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c, time.Second*time.Duration(postHandler.Env.ContextTimeout))
 	defer cancel()
 
-	userIdAny, exist := c.Get("x-user-id")
+	userId, exist := c.Get("x-user-id")
 	if !exist {
 		c.JSON(http.StatusUnauthorized, model.Message{Message: "Unauthorized"})
 		return
 	}
 
-	userID, err := primitive.ObjectIDFromHex(fmt.Sprintf("%v", userIdAny))
-	if err != nil {
-		c.IndentedJSON(http.StatusBadRequest, model.Message{Message: "Unauthorized"})
-		return
-	}
-
-	postIdStr := c.Request.URL.Query().Get("_id")
-	postID, err := primitive.ObjectIDFromHex(postIdStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, model.Message{Message: "_id not true"})
-		return
-	}
+	postId := c.Request.URL.Query().Get("_id")
 
 	var postRequest model.PostRequest
-	if err := c.ShouldBind(&postRequest); err != nil {
+	if err := c.Bind(&postRequest); err != nil {
 		c.IndentedJSON(http.StatusBadRequest, model.Message{Message: "Required data"})
 		return
 	}
@@ -147,7 +124,21 @@ func (postHandler *PostHandler) UpdatePost(c *gin.Context) {
 		return
 	}
 
-	res, err := postHandler.PostRepository.Update(ctx, postID, userID, postRequest)
+	var fileNameSave = postRequest.ImageURL
+
+	if postRequest.File != nil {
+		extension := filepath.Ext(postRequest.File.Filename)
+		fileNameSave = "upload/post/" + uuid.New().String() + extension
+		if err := c.SaveUploadedFile(postRequest.File, fileNameSave); err != nil {
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
+				"message": "Unable to save the file",
+			})
+			return
+		}
+	}
+	postRequest.ImageURL = fileNameSave
+
+	res, err := postHandler.PostRepository.Update(ctx, postId, fmt.Sprintf("%v", userId), postRequest)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, model.Message{Message: err.Error()})
 		return
@@ -165,26 +156,14 @@ func (postHandler *PostHandler) DeletePost(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c, time.Second*time.Duration(postHandler.Env.ContextTimeout))
 	defer cancel()
 
-	userIdAny, exist := c.Get("x-user-id")
+	userId, exist := c.Get("x-user-id")
 	if !exist {
 		c.JSON(http.StatusUnauthorized, model.Message{Message: "Unauthorized"})
 		return
 	}
 
-	userID, err := primitive.ObjectIDFromHex(fmt.Sprintf("%v", userIdAny))
-	if err != nil {
-		c.IndentedJSON(http.StatusBadRequest, model.Message{Message: "Unauthorized"})
-		return
-	}
-
-	postIdStr := c.Request.URL.Query().Get("_id")
-	postID, err := primitive.ObjectIDFromHex(postIdStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, model.Message{Message: "_id not true"})
-		return
-	}
-
-	res, err := postHandler.PostRepository.Delete(ctx, postID, userID)
+	postId := c.Request.URL.Query().Get("_id")
+	res, err := postHandler.PostRepository.Delete(ctx, postId, fmt.Sprintf("%v", userId))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, model.Message{Message: err.Error()})
 		return
@@ -230,12 +209,7 @@ func (postHandler *PostHandler) ListPostByUser(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c, time.Second*time.Duration(postHandler.Env.ContextTimeout))
 	defer cancel()
 
-	userIdStr := c.Request.URL.Query().Get("_id")
-	userId, err := primitive.ObjectIDFromHex(userIdStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, model.Message{Message: "user not found"})
-		return
-	}
+	userId := c.Request.URL.Query().Get("_id")
 
 	posts, err := postHandler.PostRepository.ListPostByUser(ctx, userId)
 	if err != nil {

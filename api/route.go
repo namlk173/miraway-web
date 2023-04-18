@@ -20,12 +20,14 @@ func InitRoute(app bootstrap.Application) *gin.Engine {
 	r.Use(middleware.AddHeader())
 
 	userRepository := repository.NewUserRepository(database, "user")
+	postRepository := repository.NewPostRepository(database, "post")
+
 	userHandler := handler.UserHandler{
 		UserRepository: userRepository,
+		PostRepository: postRepository,
 		Env:            env,
 	}
 
-	postRepository := repository.NewPostRepository(database, "post")
 	postHandler := handler.PostHandler{
 		PostRepository: postRepository,
 		UserRepository: userRepository,

@@ -20,7 +20,7 @@ func NewUserApi(group *gin.RouterGroup, handler handler.UserHandler) *UserApi {
 
 	s.POST("/signup", s.UserHandler.Signup)
 	s.POST("/login", s.UserHandler.Login)
-	s.POST("/refresh", s.UserHandler.RefeshToken)
+	s.POST("/refresh", s.UserHandler.RefreshToken)
 	// NEED MIDDLEWARE FOR THIS
 	s.Use(middleware.JwtAuthMiddleware(handler.Env.AccessTokenSecret))
 	s.GET("/profile", s.UserHandler.Profile)

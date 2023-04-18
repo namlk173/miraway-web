@@ -2,11 +2,11 @@ package repository
 
 import (
 	"context"
+	"fmt"
 	"go-mirayway/model"
 	"go-mirayway/mongodbImplement"
 
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type userRepository struct {
@@ -21,7 +21,7 @@ func NewUserRepository(db mongodbImplement.Database, collectionName string) mode
 	}
 }
 
-func (userRepo *userRepository) CreateUser(ctx context.Context, request *model.SignupRequest) error {
+func (userRepo *userRepository) CreateUser(ctx context.Context, request *model.User) error {
 	collection := userRepo.db.Collection(userRepo.collection)
 	_, err := collection.InsertOne(ctx, request)
 	return err
@@ -52,7 +52,8 @@ func (userRepo *userRepository) GetUserByEmail(ctx context.Context, email string
 	return &user, nil
 }
 
-func (userRepo *userRepository) GetUserByID(ctx context.Context, ID primitive.ObjectID) (*model.UserReader, error) {
+func (userRepo *userRepository) GetUserByID(ctx context.Context, ID string) (*model.UserReader, error) {
+	fmt.Println(ID)
 	collection := userRepo.db.Collection(userRepo.collection)
 	var user model.UserReader
 	if err := collection.FindOne(ctx, bson.D{{"_id", ID}}).Decode(&user); err != nil {
@@ -62,10 +63,10 @@ func (userRepo *userRepository) GetUserByID(ctx context.Context, ID primitive.Ob
 	return &user, nil
 }
 
-func (userRepo *userRepository) UpdateUser(ctx context.Context, ID primitive.ObjectID, user *model.UserReader) error {
+func (userRepo *userRepository) UpdateUser(ctx context.Context, ID string, user *model.UserReader) error {
 	collection := userRepo.db.Collection(userRepo.collection)
 	filter := bson.D{{"_id", ID}}
-	updateQuery := bson.D{{"$set", bson.D{{"firstname", user.FirstName}, {"surname", user.SurName}, {"phone", user.MobilePhone}, {"address1", user.Address1}, {"address2", user.Address2}, {"education", user.Education}, {"country", user.Counttry}, {"state", user.State}, {"avatar_url", user.AvatarURL}}}}
+	updateQuery := bson.D{{"$set", bson.D{{"firstname", user.FirstName}, {"surname", user.SurName}, {"phone", user.MobilePhone}, {"address1", user.Address1}, {"address2", user.Address2}, {"education", user.Education}, {"country", user.Country}, {"state", user.State}, {"avatar_url", user.AvatarURL}}}}
 	_, err := collection.UpdateOne(ctx, filter, updateQuery)
 	if err != nil {
 		return err
@@ -74,7 +75,7 @@ func (userRepo *userRepository) UpdateUser(ctx context.Context, ID primitive.Obj
 	return nil
 }
 
-func (userRepo *userRepository) UpdatePassword(ctx context.Context, ID primitive.ObjectID, password string) error {
+func (userRepo *userRepository) UpdatePassword(ctx context.Context, ID string, password string) error {
 	collection := userRepo.db.Collection(userRepo.collection)
 	filter := bson.D{{"_id", ID}}
 	updateQuery := bson.D{{"$set", bson.D{{"password", password}}}}

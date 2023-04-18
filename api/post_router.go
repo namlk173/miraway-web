@@ -19,8 +19,8 @@ func NewPostApi(group *gin.RouterGroup, handler handler.PostHandler) *PostApi {
 	}
 
 	s.Use(middleware.JwtAuthMiddleware(handler.Env.AccessTokenSecret))
-	s.GET("/all", s.ListAllPost)
-	s.GET("/", s.PostHandler.GetPostByID)
+	s.GET("/all", s.PostHandler.ListAllPost)
+	s.GET("/detail", s.PostHandler.GetPostByID)
 	s.POST("/create", s.PostHandler.Create)
 	s.PUT("/update", s.UpdatePost)
 	s.DELETE("/delete", s.DeletePost)

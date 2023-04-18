@@ -14,12 +14,12 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"golang.org/x/crypto/bcrypt"
 )
 
 type UserHandler struct {
 	UserRepository model.UserRepository
+	PostRepository model.PostRepository
 	Env            bootstrap.Env
 }
 
@@ -60,15 +60,22 @@ func (userHandler *UserHandler) Signup(c *gin.Context) {
 	}
 
 	user.Password = string(hashPassword)
-	if err := userHandler.UserRepository.CreateUser(ctx, &user); err != nil {
+	userCreate := model.User{
+		ID:       fmt.Sprintf("user_%v", uuid.New().String()),
+		UserName: user.UserName,
+		Email:    user.Email,
+		Password: user.Password,
+	}
+	if err := userHandler.UserRepository.CreateUser(ctx, &userCreate); err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, model.Message{Message: err.Error()})
 		return
-	} else {
-		c.IndentedJSON(http.StatusOK, model.Message{Message: "register successfully."})
 	}
+
+	c.IndentedJSON(http.StatusOK, model.Message{Message: "register successfully."})
+
 }
 
-// Login Function handler: Login User using Email and Password
+// Login Function handler: Login User using Email sand Password
 // -> Get information from user( Email and Password)
 // -> Find User in database that have Email equal Email of user has entered
 // -> Compare password which user entered and hash password of user
@@ -126,20 +133,14 @@ func (userHandler *UserHandler) Profile(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c, time.Second*time.Duration(userHandler.Env.ContextTimeout))
 	defer cancel()
 
-	idAny, exist := c.Get("x-user-id")
+	id, exist := c.Get("x-user-id")
 	if !exist {
 		c.JSON(http.StatusUnauthorized, model.Message{Message: "Unauthorized"})
 		c.Abort()
 		return
 	}
 
-	id, err := primitive.ObjectIDFromHex(fmt.Sprintf("%v", idAny))
-	if err != nil {
-		c.IndentedJSON(http.StatusUnauthorized, model.Message{Message: "Unauthorized"})
-		return
-	}
-
-	user, err := userHandler.UserRepository.GetUserByID(ctx, id)
+	user, err := userHandler.UserRepository.GetUserByID(ctx, fmt.Sprintf("%v", id))
 	if err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, model.Message{Message: err.Error()})
 		return
@@ -159,14 +160,8 @@ func (userHandler *UserHandler) ChangePassword(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c, time.Second*time.Duration(userHandler.Env.ContextTimeout))
 	defer cancel()
 
-	idAny, exist := c.Get("x-user-id")
+	id, exist := c.Get("x-user-id")
 	if !exist {
-		c.IndentedJSON(http.StatusBadRequest, model.Message{Message: "Unauthorized"})
-		return
-	}
-
-	id, err := primitive.ObjectIDFromHex(fmt.Sprintf("%v", idAny))
-	if err != nil {
 		c.IndentedJSON(http.StatusBadRequest, model.Message{Message: "Unauthorized"})
 		return
 	}
@@ -190,7 +185,7 @@ func (userHandler *UserHandler) ChangePassword(c *gin.Context) {
 		return
 	}
 
-	if err := userHandler.UserRepository.UpdatePassword(ctx, id, string(hashPassword)); err != nil {
+	if err := userHandler.UserRepository.UpdatePassword(ctx, fmt.Sprintf("%v", id), string(hashPassword)); err != nil {
 		c.IndentedJSON(http.StatusBadRequest, model.Message{Message: err.Error()})
 		return
 	}
@@ -198,7 +193,7 @@ func (userHandler *UserHandler) ChangePassword(c *gin.Context) {
 	c.IndentedJSON(http.StatusAccepted, model.Message{Message: "change password successful"})
 }
 
-func (userHandler *UserHandler) RefeshToken(c *gin.Context) {
+func (userHandler *UserHandler) RefreshToken(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c, time.Duration(userHandler.Env.ContextTimeout)*time.Second)
 	defer cancel()
 
@@ -217,13 +212,7 @@ func (userHandler *UserHandler) RefeshToken(c *gin.Context) {
 		return
 	}
 
-	id, err := primitive.ObjectIDFromHex(idExtract)
-	if err != nil {
-		c.IndentedJSON(http.StatusBadRequest, model.Message{Message: "id not true"})
-		return
-	}
-
-	user, err := userHandler.UserRepository.GetUserByID(ctx, id)
+	user, err := userHandler.UserRepository.GetUserByID(ctx, idExtract)
 	if err != nil {
 		c.IndentedJSON(http.StatusBadRequest, model.Message{Message: "not found user"})
 		return
@@ -246,16 +235,10 @@ func (userHandler *UserHandler) ChangeProfile(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c, time.Duration(userHandler.Env.ContextTimeout)*time.Second)
 	defer cancel()
 
-	idAny, exist := c.Get("x-user-id")
+	id, exist := c.Get("x-user-id")
 	if !exist {
 		c.JSON(http.StatusUnauthorized, model.Message{Message: "Unauthorized"})
 		c.Abort()
-		return
-	}
-
-	id, err := primitive.ObjectIDFromHex(fmt.Sprintf("%v", idAny))
-	if err != nil {
-		c.IndentedJSON(http.StatusUnauthorized, model.Message{Message: "Unauthorized"})
 		return
 	}
 
@@ -265,9 +248,7 @@ func (userHandler *UserHandler) ChangeProfile(c *gin.Context) {
 		return
 	}
 
-	fmt.Println(user)
-
-	var userAvatarURL string
+	var userAvatarURL = user.AvatarURL
 	if user.AvatarFile != nil {
 		extension := filepath.Ext(user.AvatarFile.Filename)
 		userAvatarURL = "upload/user/" + uuid.New().String() + extension
@@ -282,7 +263,12 @@ func (userHandler *UserHandler) ChangeProfile(c *gin.Context) {
 	user.AvatarURL = userAvatarURL
 	user.AvatarFile = nil
 
-	if err := userHandler.UserRepository.UpdateUser(ctx, id, &user); err != nil {
+	if err := userHandler.UserRepository.UpdateUser(ctx, fmt.Sprintf("%v", id), &user); err != nil {
+		c.IndentedJSON(http.StatusInternalServerError, model.Message{Message: err.Error()})
+		return
+	}
+
+	if err := userHandler.PostRepository.UpdateOwner(ctx, &user); err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, model.Message{Message: err.Error()})
 		return
 	}
