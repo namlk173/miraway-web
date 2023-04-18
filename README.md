@@ -67,6 +67,40 @@ API cho post thực hiện các chức năng:
 - "/delete": Xóa 1 post theo id của post.
 - "/all/user": Lấy ra tất cả các post của 1 user.
 
+## Data Của dự án
+**1. USER**
+``` GO
+type UserReader struct {
+	ID          string                `form:"_id,omitempty" json:"_id" bson:"_id,omitempty"`
+	UserName    string                `form:"username" json:"username" bson:"username" binding:"required"`
+	Email       string                `form:"email" json:"email" bson:"email" binding:"required,email"`
+	FirstName   string                `form:"firstname" json:"firstname,omitempty" bson:"firstname,omitempty"`
+	SurName     string                `form:"surname" json:"surname,omitempty" bson:"surname,omitempty"`
+	MobilePhone string                `form:"phone" json:"phone,omitempty" bson:"phone,omitempty"`
+	Address1    string                `form:"address1" json:"address1,omitempty" bson:"address1,omitempty"`
+	Address2    string                `form:"address2" json:"address2,omitempty" bson:"address2,omitempty"`
+	Education   string                `form:"education" json:"education,omitempty" bson:"education,omitempty"`
+	Country     string                `form:"country" json:"country,omitempty" bson:"country,omitempty"`
+	State       string                `form:"state" json:"state,omitempty" bson:"state,omitempty"`
+	AvatarURL   string                `form:"avatar_url" json:"avatar_url,omitempty" bson:"avatar_url,omitempty"`
+	AvatarFile  *multipart.FileHeader `form:"avatar_file" json:"-" bson:"avatar_file,omitempty"`
+}
+```
+**2. POST **
+
+``` GO
+type Post struct {
+	ID        string     `json:"_id,omitempty" bson:"_id,omitempty"`
+	Title     string     `json:"title" bson:"title" binding:"required"`
+	Content   string     `json:"content" bson:"content" binding:"required"`
+	ImageURL  string     `json:"image,omitempty" bson:"image,omitempty"`
+	Owner     UserReader `json:"owner" bson:"owner"`
+	CreatedAt time.Time  `json:"created_at" bson:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at,omitempty," bson:"updated_at,omitempty"`
+	IsDeleted bool       `json:"is_deleted" bson:"is_deleted"`
+}
+```
+
 
 ## Framework và thư viện sử dụng.
 **1. Framework**
